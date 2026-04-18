@@ -26,7 +26,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
@@ -34,7 +34,7 @@ jobs:
         run: |
           docker build -t $ECR_REPOSITORY .
 
-      - name: Tag Image
+      - name: Tag Docker Image
         run: |
           docker tag $ECR_REPOSITORY:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
@@ -57,12 +57,10 @@ jobs:
           script: |
 
             echo "=============================="
-            echo "🔍 SYSTEM CHECK"
+            echo "🚀 DEPLOY START"
             echo "=============================="
 
-            # --------------------------
-            # INSTALL DOCKER (if missing)
-            # --------------------------
+            # Install Docker if not present
             if ! command -v docker &> /dev/null
             then
               echo "Installing Docker..."
@@ -75,29 +73,11 @@ jobs:
               echo "Docker already installed"
             fi
 
-            # --------------------------
-            # INSTALL AWS CLI v2 (FIXED)
-            # --------------------------
-            if ! command -v aws &> /dev/null
-            then
-              echo "Installing AWS CLI v2..."
-
-              sudo apt update -y
-              sudo apt install curl unzip -y
-
-              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-              unzip awscliv2.zip
-              sudo ./aws/install
-
-              echo "AWS CLI installed successfully"
-            else
-              echo "AWS CLI already installed"
-            fi
-
             echo "=============================="
-            echo "🔐 LOGIN TO ECR"
+            echo "🔐 LOGIN TO ECR (FROM CI/CD AUTH)"
             echo "=============================="
 
+            # IMPORTANT: NO aws configure here
             aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
             echo "=============================="
