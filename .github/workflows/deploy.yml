@@ -26,7 +26,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Login to ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
@@ -34,11 +34,11 @@ jobs:
         run: |
           docker build -t $ECR_REPOSITORY .
 
-      - name: Tag Docker Image
+      - name: Tag Image
         run: |
           docker tag $ECR_REPOSITORY:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Push Docker Image
+      - name: Push Image to ECR
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
@@ -57,10 +57,12 @@ jobs:
           script: |
 
             echo "=============================="
-            echo "🔍 SYSTEM CHECK START"
+            echo "🔍 SYSTEM CHECK"
             echo "=============================="
 
-            # Install Docker if missing
+            # --------------------------
+            # INSTALL DOCKER (if missing)
+            # --------------------------
             if ! command -v docker &> /dev/null
             then
               echo "Installing Docker..."
@@ -73,12 +75,21 @@ jobs:
               echo "Docker already installed"
             fi
 
-            # Install AWS CLI if missing
+            # --------------------------
+            # INSTALL AWS CLI v2 (FIXED)
+            # --------------------------
             if ! command -v aws &> /dev/null
             then
-              echo "Installing AWS CLI..."
+              echo "Installing AWS CLI v2..."
+
               sudo apt update -y
-              sudo apt install awscli -y
+              sudo apt install curl unzip -y
+
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip awscliv2.zip
+              sudo ./aws/install
+
+              echo "AWS CLI installed successfully"
             else
               echo "AWS CLI already installed"
             fi
@@ -106,12 +117,9 @@ jobs:
             echo "🚀 RUN NEW CONTAINER"
             echo "=============================="
 
-            docker run -d \
-              -p 80:80 \
-              --name webapp \
-              --restart always \
-              ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest
+            docker run -d -p 80:80 --name webapp --restart always \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest
 
             echo "=============================="
-            echo "✅ DEPLOYMENT SUCCESSFUL"
+            echo "✅ DEPLOYMENT SUCCESS"
             echo "=============================="
