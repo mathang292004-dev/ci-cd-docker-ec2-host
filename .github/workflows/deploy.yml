@@ -87,7 +87,7 @@ jobs:
 
             echo "=== RUN NEW CONTAINER ==="
 
-            docker run -d -p 80:80 --name webapp \
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest
+            docker run -d -p 8080:80 --name webapp \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest 
 
             echo "DEPLOYMENT DONE"
