@@ -38,7 +38,7 @@ jobs:
         run: |
           docker tag $ECR_REPOSITORY:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Push Image to ECR
+      - name: Push Docker Image to ECR
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
@@ -57,10 +57,10 @@ jobs:
           script: |
 
             echo "=============================="
-            echo "🚀 DEPLOY START"
+            echo "🚀 DEPLOYMENT START"
             echo "=============================="
 
-            # Install Docker if not present
+            # Install Docker if missing
             if ! command -v docker &> /dev/null
             then
               echo "Installing Docker..."
@@ -69,19 +69,16 @@ jobs:
               sudo systemctl start docker
               sudo systemctl enable docker
               sudo usermod -aG docker ubuntu
-            else
-              echo "Docker already installed"
             fi
 
             echo "=============================="
-            echo "🔐 LOGIN TO ECR (FROM CI/CD AUTH)"
+            echo "🔐 USING IAM ROLE (NO AWS LOGIN NEEDED)"
             echo "=============================="
 
-            # IMPORTANT: NO aws configure here
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+            # IMPORTANT: NO aws configure, NO credentials needed
 
             echo "=============================="
-            echo "📥 PULL IMAGE"
+            echo "📥 PULL IMAGE FROM ECR"
             echo "=============================="
 
             docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest
