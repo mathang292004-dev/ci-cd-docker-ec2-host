@@ -26,7 +26,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
@@ -34,11 +34,11 @@ jobs:
         run: |
           docker build -t $ECR_REPOSITORY .
 
-      - name: Tag Image
+      - name: Tag Docker Image
         run: |
           docker tag $ECR_REPOSITORY:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Push Image to ECR
+      - name: Push Docker Image
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to EC2
+      - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -56,38 +56,62 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
 
-            echo "=== INSTALL CHECK ==="
+            echo "=============================="
+            echo "🔍 SYSTEM CHECK START"
+            echo "=============================="
 
+            # Install Docker if missing
             if ! command -v docker &> /dev/null
             then
+              echo "Installing Docker..."
               sudo apt update -y
               sudo apt install docker.io -y
               sudo systemctl start docker
               sudo systemctl enable docker
               sudo usermod -aG docker ubuntu
+            else
+              echo "Docker already installed"
             fi
 
+            # Install AWS CLI if missing
             if ! command -v aws &> /dev/null
             then
+              echo "Installing AWS CLI..."
+              sudo apt update -y
               sudo apt install awscli -y
+            else
+              echo "AWS CLI already installed"
             fi
 
-            echo "=== LOGIN TO ECR (US-EAST-1) ==="
+            echo "=============================="
+            echo "🔐 LOGIN TO ECR"
+            echo "=============================="
 
             aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
-            echo "=== PULL IMAGE ==="
+            echo "=============================="
+            echo "📥 PULL IMAGE"
+            echo "=============================="
 
             docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest
 
-            echo "=== STOP OLD CONTAINER ==="
+            echo "=============================="
+            echo "🛑 STOP OLD CONTAINER"
+            echo "=============================="
 
             docker stop webapp || true
             docker rm webapp || true
 
-            echo "=== RUN NEW CONTAINER ==="
+            echo "=============================="
+            echo "🚀 RUN NEW CONTAINER"
+            echo "=============================="
 
-            docker run -d -p 8080:80 --name webapp \
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest 
+            docker run -d \
+              -p 80:80 \
+              --name webapp \
+              --restart always \
+              ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest
 
-            echo "DEPLOYMENT DONE"
+            echo "=============================="
+            echo "✅ DEPLOYMENT SUCCESSFUL"
+            echo "=============================="
