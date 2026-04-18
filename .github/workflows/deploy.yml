@@ -28,19 +28,27 @@ jobs:
 
       - name: Login to Amazon ECR
         run: |
+          set -e
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build Docker Image
         run: |
+          set -e
           docker build -t $ECR_REPOSITORY .
 
       - name: Tag Docker Image
         run: |
+          set -e
           docker tag $ECR_REPOSITORY:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Push Docker Image to ECR
         run: |
+          set -e
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Verify Image Exists in ECR
+        run: |
+          aws ecr describe-images --repository-name $ECR_REPOSITORY --region $AWS_REGION
 
 
   deploy:
@@ -56,8 +64,10 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
 
+            set -e  # 🚨 IMPORTANT: FAIL FAST
+
             echo "=============================="
-            echo "🚀 DEPLOYMENT START"
+            echo "🚀 START DEPLOYMENT"
             echo "=============================="
 
             # Install Docker if missing
@@ -68,20 +78,31 @@ jobs:
               sudo apt install docker.io -y
               sudo systemctl start docker
               sudo systemctl enable docker
-              sudo usermod -aG docker ubuntu
             fi
 
             echo "=============================="
-            echo "🔐 USING IAM ROLE (NO AWS LOGIN NEEDED)"
+            echo "🔐 CHECK IAM ROLE ACCESS"
             echo "=============================="
 
-            # IMPORTANT: NO aws configure, NO credentials needed
+            aws sts get-caller-identity
 
             echo "=============================="
-            echo "📥 PULL IMAGE FROM ECR"
+            echo "🔑 LOGIN TO ECR (NO AWS CONFIG NEEDED)"
+            echo "=============================="
+
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+            echo "=============================="
+            echo "📥 PULL IMAGE"
             echo "=============================="
 
             docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest
+
+            echo "=============================="
+            echo "📦 LIST IMAGES (DEBUG)"
+            echo "=============================="
+
+            docker images
 
             echo "=============================="
             echo "🛑 STOP OLD CONTAINER"
@@ -91,12 +112,14 @@ jobs:
             docker rm webapp || true
 
             echo "=============================="
-            echo "🚀 RUN NEW CONTAINER"
+            echo "🚀 RUN CONTAINER"
             echo "=============================="
 
             docker run -d -p 80:80 --name webapp --restart always \
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/web-app-repo:latest
 
             echo "=============================="
-            echo "✅ DEPLOYMENT SUCCESS"
+            echo "📦 FINAL STATUS"
             echo "=============================="
+
+            docker ps
